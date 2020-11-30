@@ -6,46 +6,37 @@ import RPi.GPIO as GPIO
 import requests
 import socket
 
-# set to BOARD mode, it's easier to find the pin position
-GPIO.setmode(GPIO.BOARD)
-GPIO.setwarnings(False)
 
-A_ldr_1 = 35
-A_ldr_2 = 36
-B_ldr_1 = 37
-B_ldr_2 = 38
-
-# MCS device ID and key
-# it's not our real ID and key
-deviceId = "no hacking"
-deviceKey = "no hacking"
+# print the POST message, to check it's status, data and update time
+def printPost(payload, response):
+    print("Status:       ", response.status)
+    print("Data:         ", json.dumps(payload))
+    print("Update time:  ", time.strftime("%c"))
+    print()
 
 # post data to MCS
-def post_to_mcs(payload):
+def postToMCS(payload, deviceId, deviceKey):
     headers = {"Content-type": "application/json", "deviceKey": deviceKey}
-    not_connected = 1
-    
-    while (not_connected):
+    notConnected = 1
+
+    while (notConnected):
         try:
             conn = http.client.HTTPConnection("api.mediatek.com:80")
             conn.connect()
-            not_connected = 0
+            notConnected = 0
         except (http.client.HTTPException, socket.error) as ex:
             print ("Error: %s" % ex)
             time.sleep(10)
-        conn.request("POST", "/mcs/v2/devices/" + deviceId + "/datapoints", json.dumps(payload), headers)
-        response = conn.getresponse()
 
-        # print the POST message, to check it's status, data and time
-        print("Status:       ", response.status)
-        print("Data:         ", json.dumps(payload))
-        print("Update time:  ", time.strftime("%c"))
-        print()
+    conn.request("POST", "/mcs/v2/devices/" + deviceId +
+                 "/datapoints", json.dumps(payload), headers)
+    response = conn.getresponse()
 
-        data = response.read()
-        conn.close()
+    printPost(payload, response)
+    conn.close()
 
-def read_ldr(PIN):
+
+def readLdr(PIN):
     reading = 0
     GPIO.setup(PIN, GPIO.OUT)
     GPIO.output(PIN, False)
@@ -55,26 +46,26 @@ def read_ldr(PIN):
         reading = reading + 1
     return reading
 
-try:
-    while True:
-        # in our simulated court, there are 4 slots
-        A_ldr_1_reading = read_ldr(A_ldr_1)
-        A_ldr_2_reading = read_ldr(A_ldr_2)
-        B_ldr_1_reading = read_ldr(B_ldr_1)
-        B_ldr_2_reading = read_ldr(B_ldr_2)
 
-        # use function to post data
-        A_1_payload = {"datapoints": [{"dataChnId": "A_ldr_1", "values": {"value": str(A_ldr_1_reading)}}]}
-        post_to_mcs(A_1_payload)
-        A_2_payload = {"datapoints": [{"dataChnId": "A_ldr_2", "values": {"value": str(A_ldr_2_reading)}}]}
-        post_to_mcs(A_2_payload)
-        B_1_payload = {"datapoints": [{"dataChnId": "B_ldr_1", "values": {"value": str(B_ldr_1_reading)}}]}
-        post_to_mcs(B_1_payload)
-        B_2_payload = {"datapoints": [{"dataChnId": "B_ldr_2", "values": {"value": str(B_ldr_2_reading)}}]}
-        post_to_mcs(B_2_payload)
-except KeyboardInterrupt:
-    print("Close Program")
+if __name__ == '__main__':
+    # set to BOARD mode, it's easier to find the pin position
+    GPIO.setmode(GPIO.BOARD)
+    GPIO.setwarnings(False)
 
-    
+    # 4 ldr sensors' pin
+    ldrPin = [35, 36, 37, 38]
+    # 4 ldr sensors' Id on MCS
+    dataChnId = ["A_ldr_1", "A_ldr_2", "B_ldr_1", "B_ldr_2"]
 
-
+    # MCS device ID and key
+    # it's not our real ID and ke
+    deviceId = "no hacking"
+    deviceKey = "no hacking"
+    try:
+        while True:
+            for i in range(4):
+                payLoad = {"datapoints": [
+                    {"dataChnId": dataChnId[i], "values": {"value": str(ldrPin[i])}}]}
+                postToMCS(payLoad, deviceId, deviceKey)
+    except KeyboardInterrupt:
+        print("Close Program")
